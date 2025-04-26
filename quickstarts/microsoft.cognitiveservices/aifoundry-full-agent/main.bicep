@@ -17,7 +17,7 @@ param foundryAccountName string
 param location string = 'westus2'
 
 @description('Name of the project')
-param defaultProjectName string = '${foundryAccountName}-proj'
+param defaultProjectName string = '${foundryAccountName}proj'
 param defaultProjectDisplayName string = 'Project'
 param defaultProjectDescription string = 'Describe what your project is about.'
 
@@ -130,15 +130,7 @@ resource newStorageAccount 'Microsoft.Storage/storageAccounts@2023-04-01' = if (
 resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-04-01' existing = if (newOrExisting == 'existing') {
   name: storageAccountName
 }
-var storageSelectedId = ((newOrExisting == 'new') ? newStorageAccount.id : existingStorageAccount.id)
-var cosmosDbSelectedId = ((newOrExisting == 'new') ? newCosmosDBAccount.id : existingCosmosDBAccount.id)
-var searchSelectedId = ((newOrExisting == 'new') ? newSearchService.id : existingSearchService.id)
-var storageSelectedLocation = ((newOrExisting == 'new') ? newStorageAccount.location : existingStorageAccount.location)
-var cosmosDbSelectedLocation = ((newOrExisting == 'new') ? newCosmosDBAccount.location : existingCosmosDBAccount.location)
-var searchSelectedLocation = ((newOrExisting == 'new') ? newSearchService.location : existingSearchService.location)
-var storageSelectedTarget = ((newOrExisting == 'new') ? newStorageAccount.properties.primaryEndpoints.blob : existingStorageAccount.properties.primaryEndpoints.blob)
-var cosmosDbSelectedTarget = ((newOrExisting == 'new') ? newCosmosDBAccount.properties.documentEndpoint : existingCosmosDBAccount.properties.documentEndpoint)
-var searchSelectedTarget = ((newOrExisting == 'new') ? newSearchService.properties.endpoint : existingSearchService.properties.endpoint)
+
 /*
   Step 4: Create Connections
 */
@@ -147,12 +139,12 @@ resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/proje
   parent: project
   properties: {
     category: 'CosmosDB'
-    target: cosmosDbSelectedTarget
+    target: ((newOrExisting == 'new') ? newCosmosDBAccount.properties.documentEndpoint : existingCosmosDBAccount.properties.documentEndpoint)
     authType: 'AAD'
     metadata: {
       ApiType: 'Azure'
-      ResourceId: cosmosDbSelectedId
-      location: cosmosDbSelectedLocation
+      ResourceId: ((newOrExisting == 'new') ? newCosmosDBAccount.id : existingCosmosDBAccount.id)
+      location: ((newOrExisting == 'new') ? newCosmosDBAccount.location : existingCosmosDBAccount.location)
     }
   }
 }
@@ -162,12 +154,12 @@ resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/
   parent: project
   properties: {
     category: 'AzureStorageAccount'
-    target: storageSelectedTarget
+    target: ((newOrExisting == 'new') ? newStorageAccount.properties.primaryEndpoints.blob : existingStorageAccount.properties.primaryEndpoints.blob)
     authType: 'AAD'
     metadata: {
       ApiType: 'Azure'
-      ResourceId: storageSelectedId
-      location: storageSelectedLocation
+      ResourceId: ((newOrExisting == 'new') ? newStorageAccount.id : existingStorageAccount.id)
+      location: ((newOrExisting == 'new') ? newStorageAccount.location : existingStorageAccount.location)
     }
   }
 }
@@ -177,18 +169,59 @@ resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts
   parent: project
   properties: {
     category: 'CognitiveSearch'
-    target: searchSelectedTarget
+    target: ((newOrExisting == 'new') ? newSearchService.properties.endpoint : existingSearchService.properties.endpoint)
     authType: 'AAD'
     isSharedToAll: true
     metadata: {
       ApiType: 'Azure'
-      ResourceId: searchSelectedId
-      location: searchSelectedLocation
+      ResourceId: ((newOrExisting == 'new') ? newSearchService.id : existingSearchService.id)
+      location: ((newOrExisting == 'new') ? newSearchService.location : existingSearchService.location)
     }
+  }
+}
+/*
+  Step 5: Project MI role assignment
+*/
+
+module roleAssignment './Module/Role-assignment.bicep' = {
+  name: 'role-assignment'
+  scope: resourceGroup()
+  dependsOn: [
+    project
+  ]
+  params:{
+    storageAccountName: storageAccountName
+	searchAccountName: aiSearchName
+	cosmosdbName: cosmosDBAccountName
+	projectName: defaultProjectName
+    principalId: project.identity.principalId
   }
 }
 
 /*
+  Step 6: Create Account and Project Capability Host
+*/
+resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-04-01-preview' = {
+  name: '${foundryAccountName}-accountCapHost'
+  parent: account
+  properties: {
+    capabilityHostKind: 'Agents'
+    }
+}
+
+/*
+resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-04-01-preview' = {
+  name: '${foundryAccountName}-projectCapHost'
+  parent: project
+  properties: {
+    capabilityHostKind: 'Agents'
+    vectorStoreConnections: [project_connection_azureai_search.name]
+    storageConnections: [project_connection_azure_storage.name]
+    threadStorageConnections : [project_connection_cosmosdb.name]
+    }
+}
+
+
   Optional Step: Deploy gpt-4o model
   - Subscription may not enable or have sufficient quota for gpt-4o model. Please adjust model accordingly to execute
   - Agents will use the build-in model deployments
@@ -209,5 +242,6 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-
   }
 }
 */
+
 output accountId string = account.id
 output accountName string = account.name

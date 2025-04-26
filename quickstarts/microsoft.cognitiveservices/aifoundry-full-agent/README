@@ -1,0 +1,13 @@
+Sample Bicep Deployment Commands:
+
+1 Create full set of AI Agent resources with new dependent resources (Storage, CosmosDB, Search account)
+az deployment group create --name ExampleDeployment --resource-group {ResourceGroup Name} --template-file {template path} --parameters newOrExisting=new foundryAccountName={new foundry account name}
+
+2 Create full set of AI Agent resources with existing dependent resources (Storage, CosmosDB, Search account)
+
+az deployment group create --name ExampleDeployment --resource-group {ResourceGroup Name} --template-file {template path} --parameters newOrExisting=existing cosmosDBAccountName={BYO CosmosDB account name} storageAccountName={BYO storage account name} aiSearchName={BYO search account name} foundryAccountName={new foundry account name}
+
+*Current limitation
+DocumentDB SQL role assignment will fail in bicep deployment due to new principle id replication delay on SQL service side.
+Please grant the MI proper permission with following command: 
+az cosmosdb sql role assignment create --subscription {sub id} --resource-group {rg name} --account-name {cosmosdb account name} --role-definition-name "Cosmos DB Built-in Data Contributor" --principal-id {project managed identity principle id} --scope "/"
