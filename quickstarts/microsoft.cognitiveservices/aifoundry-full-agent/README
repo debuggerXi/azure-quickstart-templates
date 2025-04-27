@@ -1,15 +1,20 @@
 Sample Bicep Deployment Commands:
 
+Step One: Provision Resources
 1 Create full set of AI Agent resources with new dependent resources (Storage, CosmosDB, Search account)
-az deployment group create --name ExampleDeployment --resource-group {ResourceGroup Name} --template-file {template path} --parameters newOrExisting=new foundryAccountName={new foundry account name}
+az deployment group create --name ExampleDeployment --resource-group {ResourceGroup Name} --template-file {template path to step1-provision-resources.bicep} --parameters newOrExisting=new foundryAccountName={new foundry account name}
 
 2 Create full set of AI Agent resources with existing dependent resources (Storage, CosmosDB, Search account)
 
-az deployment group create --name ExampleDeployment --resource-group {ResourceGroup Name} --template-file {template path} --parameters newOrExisting=existing cosmosDBAccountName={BYO CosmosDB account name} storageAccountName={BYO storage account name} aiSearchName={BYO search account name} foundryAccountName={new foundry account name}
+az deployment group create --name ExampleDeployment --resource-group {ResourceGroup Name} --template-file {template path to step1-provision-resources.bicep} --parameters newOrExisting=existing cosmosDBAccountName={BYO CosmosDB account name} storageAccountName={BYO storage account name} aiSearchName={BYO search account name} foundryAccountName={new foundry account name}
 
-*Current limitation
-DocumentDB SQL role assignment will fail in bicep deployment due to new principle id replication delay on SQL service side.
-Please grant the MI proper permission with following command: 
-az cosmosdb sql role assignment create --subscription {sub id} --resource-group {rg name} --account-name {cosmosdb account name} --role-definition-name "Cosmos DB Built-in Data Contributor" --principal-id {project managed identity principle id} --scope "/"
+Step Two: Grant Role Assignments
+az deployment group create --name ExampleDeployment --resource-group {ResourceGroup Name} --template-file {template path to step2-grant-role-assignments.bicep} --parameters storageAccountName={BYO storage account name} searchAccountName={BYO search account name} cosmosdbName={BYO CosmosDB account name} accountName={foundry account name} projectName={foundry project name}
 
-and then run only the project caphost creation (it has been commented out in the main.bicep)
+Step Three: Create Capability Host
+az deployment group create --name ExampleDeployment --resource-group {ResourceGroup Name} --template-file {template path to step3-create-capability-host.bicep} --parameters storageConnectionName={BYO storage account name} searchConnectionName={BYO search account name} cosmosdbConnectionName={BYO CosmosDB account name} accountName={foundry account name} projectName={foundry project name}
+
+*Why have to do three steps
+Due to the role assignment delay and the limitation that Bicep template cannot wait and retry https://github.com/Azure/bicep/issues/1013
+We have to break the full setup into three bicep file
+Bicep team will have a fix soon. Please refer to discussion in https://github.com/Azure/bicep/issues/1013

@@ -135,7 +135,7 @@ resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-04-01' e
   Step 4: Create Connections
 */
 resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = {
-  name: 'myThreadStorageProjectConnectionName'
+  name: cosmosDBAccountName
   parent: project
   properties: {
     category: 'CosmosDB'
@@ -150,7 +150,7 @@ resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/proje
 }
 
 resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = {
-  name: 'myStorageProjectConnectionName'
+  name: storageAccountName
   parent: project
   properties: {
     category: 'AzureStorageAccount'
@@ -165,7 +165,7 @@ resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/
 }
 
 resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = {
-  name: 'myVectorStoreProjectConnectionName'
+  name: aiSearchName
   parent: project
   properties: {
     category: 'CognitiveSearch'
@@ -179,69 +179,6 @@ resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts
     }
   }
 }
-/*
-  Step 5: Project MI role assignment
-*/
-
-module roleAssignment './Module/Role-assignment.bicep' = {
-  name: 'role-assignment'
-  scope: resourceGroup()
-  dependsOn: [
-    project
-  ]
-  params:{
-    storageAccountName: storageAccountName
-	searchAccountName: aiSearchName
-	cosmosdbName: cosmosDBAccountName
-	projectName: defaultProjectName
-    principalId: project.identity.principalId
-  }
-}
-
-/*
-  Step 6: Create Account and Project Capability Host
-*/
-resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-04-01-preview' = {
-  name: '${foundryAccountName}-accountCapHost'
-  parent: account
-  properties: {
-    capabilityHostKind: 'Agents'
-    }
-}
-
-/*
-resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-04-01-preview' = {
-  name: '${foundryAccountName}-projectCapHost'
-  parent: project
-  properties: {
-    capabilityHostKind: 'Agents'
-    vectorStoreConnections: [project_connection_azureai_search.name]
-    storageConnections: [project_connection_azure_storage.name]
-    threadStorageConnections : [project_connection_cosmosdb.name]
-    }
-}
-
-
-  Optional Step: Deploy gpt-4o model
-  - Subscription may not enable or have sufficient quota for gpt-4o model. Please adjust model accordingly to execute
-  - Agents will use the build-in model deployments
-
-resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01'= {
-  parent: account
-  name: 'gpt-4o'
-  sku : {
-    capacity: 1
-    name: 'GlobalStandard'
-  }
-  properties: {
-    model:{
-      name: 'gpt-4o'
-      format: 'OpenAI'
-      version: '2024-08-06'
-    }
-  }
-}
-*/
 
 output accountId string = account.id
 output accountName string = account.name
